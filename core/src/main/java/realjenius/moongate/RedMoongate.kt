@@ -59,12 +59,12 @@ class RedMoongate : ApplicationAdapter() {
     if (now - start > 1000) {
       start = now
       chunkStart += 9
-      println("Advanced to chunks: $chunkStart - ${chunkStart+9}")
     }
     Gdx.gl.glClearColor(0f, 0f, 0f, 1f)
     Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
     camera.update()
     batch.projectionMatrix = camera.combined
+    shapes.projectionMatrix = camera.combined
     batch.begin()
     (0..8).forEach { chunkIdx ->
       val chunk = Maps.chunks[chunkStart + chunkIdx]
@@ -79,18 +79,14 @@ class RedMoongate : ApplicationAdapter() {
         }
       }
     }
-
     batch.end()
 
-    /*
     shapes.begin(ShapeRenderer.ShapeType.Filled)
-    renderPalette(0, Palettes.gamePalette)
+    renderPalette(400, Palettes.gamePalette)
     Palettes.cutscenePalettes.forEachIndexed { idx, pal ->
-      renderPalette(100 + idx * 100, pal)
+      if (idx > 0) renderPalette(440 + (idx * 40), pal)
     }
-*/
-
-
+    shapes.end()
   }
 
   private fun renderPalette(xOffset: Int, pal: Palette) {
