@@ -2,6 +2,7 @@ package realjenius.moongate
 
 import com.badlogic.gdx.ApplicationAdapter
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.Input
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.OrthographicCamera
@@ -21,12 +22,16 @@ import realjenius.moongate.screen.Palettes
 import realjenius.moongate.screen.Tiles
 
 class RedMoongate : ApplicationAdapter() {
+  private val MAP_WIDTH = 320
+  private val MAP_HEIGHT = 200
   private lateinit var camera: OrthographicCamera
   private lateinit var batch: SpriteBatch
   private lateinit var shapes: ShapeRenderer
   private lateinit var tileTextures: List<Texture>
-  private var start: Long = 0
-  private var chunkStart = 0
+  private val viewableMap = ByteArray(320 * 200 * 16)
+
+  private var originX = 0
+  private var originY = 0
   override fun create() {
     camera = OrthographicCamera(Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
     camera.setToOrtho(false, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
@@ -50,43 +55,49 @@ class RedMoongate : ApplicationAdapter() {
       }
       Texture(pixmap).apply { pixmap.dispose() }
     }
+    rebuildMap()
+  }
 
-    start = System.currentTimeMillis()
+  private fun rebuildMap() {
+    val mapRowLength = Maps.getRowWidth(0)
+    var viewportIdx = 0
+    (0 until MAP_HEIGHT).forEach { y ->
+      (0 until MAP_WIDTH).forEach { x ->
+        val sourceMapX = (originX + x)// and 1023
+        val sourceMapY = (originY + y) //and 1023 // TODO - is this right??
+        viewableMap[viewportIdx] = Maps.surfaceMap[sourceMapY * mapRowLength + sourceMapX]
+        viewportIdx++
+      }
+    }
   }
 
   override fun render() {
-    val now = System.currentTimeMillis()
-    if (now - start > 1000) {
-      start = now
-      chunkStart += 9
-    }
     Gdx.gl.glClearColor(0f, 0f, 0f, 1f)
     Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+
+    var changed = false
+    if (Gdx.input.isKeyPressed(Input.Keys.LEFT)) { originX = (originX-1).coerceAtLeast(0); changed = true }
+    if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) { originX += 1; changed = true }
+    if (Gdx.input.isKeyPressed(Input.Keys.UP)) { originY = (originY-1).coerceAtLeast(0); changed = true }
+    if (Gdx.input.isKeyPressed(Input.Keys.DOWN)) { originY += 1; changed = true }
+
+    if(changed) rebuildMap()
+
     camera.update()
     batch.projectionMatrix = camera.combined
-    shapes.projectionMatrix = camera.combined
     batch.begin()
-    (0..8).forEach { chunkIdx ->
-      val chunk = Maps.chunks[chunkStart + chunkIdx]
-      val chunkX = (chunkIdx % 3) * (16 * 8 + 2)
-      val chunkY = (12*8+2) * 3 - (chunkIdx / 3) * (16 * 8 + 2)
+    (0 until MAP_HEIGHT).forEach { y ->
+      (0 until MAP_WIDTH).forEach { x ->
+        val drawX = x * 16
+        val drawY = (MAP_HEIGHT * 16) - y * 16
 
-      (0 until 8).forEach { y ->
-        (0 until 8).forEach { x ->
-          val tileIdx = chunk.tiles[x + y * 8]
-          val tile = tileTextures[tileIdx.toUByte().toInt()]
-          batch.draw(tile, chunkX + (x * 16).toFloat(), chunkY + ((7-y) * 16).toFloat())
-        }
+        val tile = tileTextures[viewableMap[(y * MAP_WIDTH) + x].toUByte().toInt()]
+
+        batch.draw(tile, drawX.toFloat(), drawY.toFloat())
       }
     }
-    batch.end()
 
-    shapes.begin(ShapeRenderer.ShapeType.Filled)
-    renderPalette(400, Palettes.gamePalette)
-    Palettes.cutscenePalettes.forEachIndexed { idx, pal ->
-      if (idx > 0) renderPalette(440 + (idx * 40), pal)
-    }
-    shapes.end()
+    batch.end()
   }
 
   private fun renderPalette(xOffset: Int, pal: Palette) {
