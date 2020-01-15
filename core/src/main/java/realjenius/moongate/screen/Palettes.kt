@@ -1,7 +1,6 @@
 package realjenius.moongate.screen
 
 import okio.Buffer
-import okio.BufferedSource
 import okio.buffer
 import okio.source
 import realjenius.moongate.io.GameFiles
@@ -31,14 +30,14 @@ data class Palette(val values: List<Rgb>) {
     }
 
     private fun load(buffer: Buffer) = Palette(
-          (0 until 256).map {
-            Rgb(
-                translateColor(buffer.readUByte()),
-                translateColor(buffer.readUByte()),
-                translateColor(buffer.readUByte())
-            )
-          }.toList()
-      )
+        (0 until 256).map {
+          Rgb(
+              translateColor(buffer.readUByte()),
+              translateColor(buffer.readUByte()),
+              translateColor(buffer.readUByte())
+          )
+        }.toList()
+    )
 
     // The left shift magnifies the color to match modern ranges. U6 stores these as 0-63, not 0-255
     private fun translateColor(byte: UByte) = (byte.toUInt() shl 2).toFloat() / 255

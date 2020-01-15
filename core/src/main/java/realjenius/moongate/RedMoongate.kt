@@ -6,18 +6,10 @@ import com.badlogic.gdx.Input
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.OrthographicCamera
-import com.badlogic.gdx.graphics.Pixmap
-import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
-import realjenius.moongate.converse.Conversation
 import realjenius.moongate.converse.Conversations
-import realjenius.moongate.io.GameFiles
-import realjenius.moongate.io.LZW
-import realjenius.moongate.io.LibraryIO
-import realjenius.moongate.io.LibraryType
 import realjenius.moongate.screen.Maps
-import realjenius.moongate.screen.Palette
 import realjenius.moongate.screen.Palettes
 import realjenius.moongate.screen.Tiles
 
@@ -27,7 +19,6 @@ class RedMoongate : ApplicationAdapter() {
   private lateinit var camera: OrthographicCamera
   private lateinit var batch: SpriteBatch
   private lateinit var shapes: ShapeRenderer
-  private lateinit var tileTextures: List<Texture>
   private val viewableMap = ByteArray(320 * 200 * 16)
 
   private var originX = 0
@@ -42,19 +33,6 @@ class RedMoongate : ApplicationAdapter() {
     Palettes.load()
     Tiles.load()
     Maps.load()
-    tileTextures = Tiles.tiles.map {
-      val pixmap = Pixmap(16, 16, Pixmap.Format.RGBA8888)
-      (0 until 16).forEach { row ->
-        (0 until 16).forEach { col ->
-          val value = it.data[row + col*16]
-          val color = Palettes.gamePalette.values[value.toUByte().toInt()].let {
-            Color.argb8888(it.red, it.green, it.blue, 1.toFloat())
-          }
-          pixmap.drawPixel(row, col, color)
-        }
-      }
-      Texture(pixmap).apply { pixmap.dispose() }
-    }
     rebuildMap()
   }
 
@@ -90,23 +68,20 @@ class RedMoongate : ApplicationAdapter() {
       (0 until MAP_WIDTH).forEach { x ->
         val drawX = x * 16
         val drawY = (MAP_HEIGHT * 16) - y * 16
+        val tileIndex = viewableMap[(y * MAP_WIDTH) + x].toUByte().toInt()
+        if (tileIndex == 0)
+          shapes.rect(drawX.toFloat(), drawY.toFloat(), 16.toFloat(), 16.toFloat(), Color.BLACK, Color.BLACK, Color.BLACK, Color.BLACK)
+        else {
+          if (Tiles.isAnimatedMapTile(tileIndex))
+            batch.draw(Tiles.getAnimatedBaseTile(tileIndex).sprite, drawX.toFloat(), drawY.toFloat())
+          batch.draw(Tiles.tiles[tileIndex].sprite, drawX.toFloat(), drawY.toFloat())
+        }
 
-        val tile = tileTextures[viewableMap[(y * MAP_WIDTH) + x].toUByte().toInt()]
 
-        batch.draw(tile, drawX.toFloat(), drawY.toFloat())
+
       }
     }
-
     batch.end()
-  }
-
-  private fun renderPalette(xOffset: Int, pal: Palette) {
-    pal.values.forEachIndexed { index, rgb ->
-      val y = index % 100 * 10
-      val x = index / 100 * 10 + xOffset
-      shapes.setColor(rgb.red, rgb.green, rgb.blue, 1.toFloat())
-      shapes.rect(x.toFloat(), y.toFloat(), 10.toFloat(), 10.toFloat())
-    }
   }
 
   override fun dispose() {

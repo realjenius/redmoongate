@@ -27,8 +27,8 @@ object Maps {
         val c1 = ((map[1].toUByte().toInt() and 0xf) shl 8) or map[0].toUByte().toInt()
         val c2 = (map[2].toUByte().toInt() shl 4) or (map[1].toUByte().toInt() shr 4)
 
-        readChunk(surface, chunk, c1*64, worldX + second * 8, worldY + first * 8)
-        readChunk(surface, chunk, c2*64, worldX + (second+1) * 8, worldY + first * 8)
+        readChunk(surface, chunk, c1 * 64, worldX + second * 8, worldY + first * 8)
+        readChunk(surface, chunk, c2 * 64, worldX + (second + 1) * 8, worldY + first * 8)
         map.shift(3)
       }
     }

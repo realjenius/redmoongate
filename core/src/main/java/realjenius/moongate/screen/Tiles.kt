@@ -1,20 +1,44 @@
 package realjenius.moongate.screen
 
+import com.badlogic.gdx.graphics.Color
+import com.badlogic.gdx.graphics.Pixmap
+import com.badlogic.gdx.graphics.Texture
+import com.badlogic.gdx.graphics.g2d.TextureRegion
 import okio.Buffer
 import okio.buffer
 import okio.source
 import realjenius.moongate.io.ByteView
 import realjenius.moongate.io.GameFiles
 import realjenius.moongate.io.LZW
+import realjenius.moongate.screen.Tiles.TRANSPARENT
 import java.util.*
 
 object Tiles {
+  const val TRANSPARENT = 0xff.toByte() // move somewhere more appropriate.
   private const val TILE_COUNT = 2048
-  private const val ARTICLE_SECTION_SKIP = (5120 - (TILE_COUNT*2)).toLong()
+  private const val ARTICLE_SECTION_SKIP = (5120 - (TILE_COUNT *2)).toLong()
   private val TRIGGERED_ANIM = setOf(862, 1009, 1020) // crank, crank, chain
 
+  // Animated tiles are from 16-48, we use this to find the base animation tile to file the base layer
+  private val ANIMATION_SRC_TILES = listOf(
+      0x16,0x16,0x1a,0x1a,0x1e,0x1e,0x12,0x12,0x1a,0x1e,0x16,0x12,0x16,0x1a,0x1e,0x12,
+      0x1a,0x1e,0x1e,0x12,0x12,0x16,0x16,0x1a,0x12,0x16,0x1e,0x1a,0x1a,0x1e,0x12,0x16
+  )
+  private val ANIMATED_TILE_COUNT = ANIMATION_SRC_TILES.size
+  private const val ANIMATED_TILE_OFFSET = 16
+
   lateinit var tiles: List<Tile>
+  lateinit var masterTexture: Texture
   lateinit var animationData: AnimationInfo
+
+  /*
+
+  static const uint16 U6_ANIM_SRC_TILE[32] = {};
+  Tile *TileManager::get_anim_base_tile(uint16 tile_num)
+{
+ return &tile[tileindex[U6_ANIM_SRC_TILE[tile_num-16]/2]];
+}
+   */
 
   fun load() {
     // TODO share a target buffer on map and obj tile files.
@@ -31,7 +55,12 @@ object Tiles {
     assert(tiles.size == TILE_COUNT)
     loadTileFlags(tiles)
     animationData = loadAnimationData()
+    loadAnimationMasks()
+    generateSpriteSheet()
   }
+
+  fun isAnimatedMapTile(idx: Int) = idx in (ANIMATED_TILE_OFFSET until ANIMATED_TILE_OFFSET + ANIMATED_TILE_COUNT)
+  fun getAnimatedBaseTile(idx: Int) = tiles[ANIMATION_SRC_TILES[idx-ANIMATED_TILE_OFFSET] / 2]
 
   private fun loadTiles(maskTypes: ByteArray, allTiles: ByteArray) =
       GameFiles.loadExternal("TILEINDX.VGA").source().buffer().use { tileIndices ->
@@ -43,7 +72,7 @@ object Tiles {
           val maskType = MaskType.forByte(maskTypes[it].toUByte())
           tileView.seek(offset.toInt())
           val data = readTileData(tileView, maskType)
-          Tile(num, data)
+          Tile(num, data).apply { this.transparent = maskType.isTransparent() }
         }
       }
 
@@ -98,6 +127,40 @@ object Tiles {
       AnimationInfo(animCount, data)
     }
   }
+
+  private fun loadAnimationMasks() {
+    val maskData = ByteView(LZW.decompress(GameFiles.loadExternal("ANIMMASK.VGA")), 0)
+    (0 until 32).forEach { maskIdx ->
+      val tile = tiles[ANIMATED_TILE_OFFSET + maskIdx]
+      tile.transparent = true
+      var tileDataIndex = 0
+      maskData.seek(maskIdx * 64)
+      var clearByteCount = maskData[0].toUByte().toInt()
+      if (clearByteCount > 0) {
+        tile.clearPixels(tileDataIndex, clearByteCount)
+        tileDataIndex += clearByteCount
+      }
+      maskData.shift(1)
+
+      var displacement = maskData[0].toUByte().toInt()
+      clearByteCount = maskData[1].toUByte().toInt()
+      while (displacement != 0 && clearByteCount != 0) {
+        maskData.shift(2)
+        tileDataIndex += displacement
+        tile.clearPixels(tileDataIndex, clearByteCount)
+        tileDataIndex += clearByteCount
+        displacement = maskData[0].toUByte().toInt()
+        clearByteCount = maskData[1].toUByte().toInt()
+      }
+    }
+  }
+
+  private fun generateSpriteSheet() {
+    val pixmap = Pixmap((tiles.size * 16) / 4, (tiles.size * 16) / 4, Pixmap.Format.RGBA8888)
+    tiles.forEachIndexed { index, tile -> tile.generateTexture((index / 4 * 16), index % 4 * 16, pixmap) }
+    val spriteSheet = Texture(pixmap).apply { pixmap.dispose() }
+    tiles.forEachIndexed { index, tile -> tile.bindRegion(spriteSheet, (index / 4 * 16), index % 4 * 16) }
+  }
 }
 
 enum class MaskType(val value: UByte) {
@@ -140,9 +203,36 @@ enum class ArticleType(val mask: Int) {
   }
 }
 
-class Tile(val number: Int, val data: ByteArray) {
+class Tile(val number: Int, data: ByteArray) {
+  var data: ByteArray? = data // nullable so we can release the memory!
   var flags = TileFlag.emptySet()
+  var transparent = false
+  lateinit var sprite: TextureRegion
   lateinit var articleType: ArticleType
+
+  fun clearPixels(offset: Int, count: Int) {
+    data!!.fill(TRANSPARENT, offset, offset+count)
+  }
+
+  fun generateTexture(xOffset: Int, yOffset: Int, pixmap: Pixmap) {
+    assert(data != null)
+
+    (0 until 16).forEach { row ->
+      (0 until 16).forEach { col ->
+        val value = data!![row + col * 16]
+        val color =
+            if (this.transparent && value == TRANSPARENT) Color.argb8888(1.toFloat(), 1.toFloat(), 1.toFloat(), 0.toFloat())
+            else Palettes.gamePalette.values[value.toUByte().toInt()].let {
+              Color.argb8888(it.red, it.green, it.blue, 1.toFloat())
+            }
+        pixmap.drawPixel(xOffset + row, yOffset + col, color)
+      }
+    }
+    this.data = null
+  }
+  fun bindRegion(texture: Texture, xOffset: Int, yOffset: Int) {
+    this.sprite = TextureRegion(texture, xOffset, yOffset, 16, 16)
+  }
 }
 
 data class AnimationInfo(val count: Int, val data: List<AnimationData>)
