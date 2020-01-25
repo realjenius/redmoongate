@@ -1,4 +1,4 @@
-package realjenius.moongate.screen
+package realjenius.moongate.gamedata.palette
 
 import okio.Buffer
 import okio.buffer

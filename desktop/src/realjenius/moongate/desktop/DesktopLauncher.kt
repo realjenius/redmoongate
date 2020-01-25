@@ -7,5 +7,7 @@ import realjenius.moongate.RedMoongate
 
 fun main() {
   val config = LwjglApplicationConfiguration()
+  config.width = 1536
+  config.height = 1152
   LwjglApplication(RedMoongate(), config)
 }

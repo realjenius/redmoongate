@@ -11,32 +11,39 @@ import java.io.File
 
 private const val MAX_WORD_LEN = 12
 private const val STARTING_WORD_LEN = 9
+private const val REINIT_MARKER = 0x100U
+private const val END_MARKER = 0x101U
 private const val STARTING_NEXT_WORD = 0x102U
 private const val STARTING_DICT_SIZE = 0x200U
 
 object LZW {
-  fun decompress(file: File) : ByteArray {
-    return file.source().buffer().use {
-      decompress(it)
-    }
+  fun decompress(file: File) = file.source().buffer().use {
+    decompress(it)
+  }
+
+  fun decompressInto(file: File, target: Buffer) = file.source().buffer().use {
+    decompressInto(it, target)
   }
 
   fun decompress(buffer: BufferedSource) : ByteArray {
-    //buffer.require(4)
+    return Buffer().apply { decompressInto(buffer, this) }.readByteArray()
+  }
+
+  fun decompressInto(buffer: BufferedSource, target: Buffer) {
     val uncompressedSize = buffer.readIntLe()
-    if (uncompressedSize == 0) return buffer.readByteArray()
-    var endMarker = false
-    val state = DecompressState(source = buffer)
-    while (!endMarker && !buffer.exhausted()) {
+    if (uncompressedSize == 0) {
+      target.writeAll(buffer)
+      return
+    }
+    val state = DecompressState(source = buffer, target = target)
+    while (!buffer.exhausted()) {
       var codeword = readCodeword(state)
-      if (codeword == 0x100U) {
+      if (codeword == REINIT_MARKER) {
         state.reinit()
         codeword = readCodeword(state)
         state.addByte(codeword)
-      } else if (codeword == 0x101U) {
-        endMarker = true
-        break
-      } else {
+      } else if (codeword == END_MARKER) break
+      else {
         state.addSegment(
             if (codeword < state.nextWord) readSegment(codeword, state.segments)
             else {
@@ -48,7 +55,6 @@ object LZW {
       }
       state.advanceCodeword(codeword)
     }
-    return state.target.readByteArray()
   }
 
   private fun readCodeword(state: DecompressState) : UInt {

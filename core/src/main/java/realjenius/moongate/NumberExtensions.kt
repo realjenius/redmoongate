@@ -1,6 +1,6 @@
 package realjenius.moongate
 
-import okio.ByteString
+fun Byte.uByteToInt() = this.toUByte().toInt()
 
 fun UByte.toChar() = this.toShort().toChar()
 fun UInt.toChar() = this.toLong().toChar()
