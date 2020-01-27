@@ -59,12 +59,20 @@
     { "id": 56, "name": "BOLT", "stackable": true },
     { "id": 57, "name": "SPELLBOOK", "container": true, "containerCondition": "spellbook" },
     { "id": 58, "name": "SPELL" },
-    { "id": 59, "name": "CODEX" },
+    { "id": 59, "name": "CODEX", "uses": [
+      { "triggers": ["look"], "frame": 0, "action": "sign" }
+    ]},
     { "id": 60, "name": "BOOK_OF_PROPHECIES" },
-    { "id": 61, "name": "BOOK_OF_CIRCLES" },
+    { "id": 61, "name": "BOOK_OF_CIRCLES", "uses": [
+      { "triggers": ["look"], "action": "sign" }
+    ]},
     { "id": 62, "name": "VORTEX_CUBE", "container": true, "containerCondition": "vortexCube" },
-    { "id": 63, "name": "LOCK_PICK", "stackable": true },
-    { "id": 64, "name": "KEY" },
+    { "id": 63, "name": "LOCK_PICK", "stackable": true, "uses": [
+      { "triggers": ["use", "search", "get"], "action": "key" }
+    ]},
+    { "id": 64, "name": "KEY", "uses": [
+      { "triggers": ["use"], "action": "key" }
+    ]},
     { "id": 65, "name": "BLACK_PEARL", "weightModifier": 0.1, "stackable": true },
     { "id": 66, "name": "BLOOD_MOSS", "weightModifier": 0.1, "stackable": true },
     { "id": 67, "name": "GARLIC", "weightModifier": 0.1, "stackable": true },
@@ -78,10 +86,14 @@
     { "id": 75, "name": "SNAKE_AMULET" },
     { "id": 76, "name": "AMULET_OF_SUBMISSION" },
     { "id": 77, "name": "GEM", "stackable": true },
-    { "id": 78, "name": "STAFF" },
+    { "id": 78, "name": "STAFF", "uses": [
+      { "triggers": ["use"], "action": "staff" }
+    ]},
     { "id": 79, "name": "LIGHTNING_WAND" },
     { "id": 80, "name": "FIRE_WAND" },
-    { "id": 81, "name": "STORM_CLOAK" },
+    { "id": 81, "name": "STORM_CLOAK","uses": [
+      { "triggers": ["ready"], "action": "stormCloak" }
+    ]},
     { "id": 82, "name": "RING" },
     { "id": 83, "name": "FLASK_OF_OIL", "stackable": true, "breakable":  true },
     { "id": 84, "name": "RED_GATE" },
@@ -98,7 +110,10 @@
     { "id": 95, "name": "GRAPES" },
     { "id": 96, "name": "BUTTER" },
     { "id": 97, "name": "GARGISH_VOCABULARY" },
-    { "id": 98, "name": "CHEST", "container": true, "containerCondition": "openable" },
+    { "id": 98, "name": "CHEST", "container": true, "containerCondition": "openable", "uses": [
+      { "triggers": ["search", "use"], "frame": 0, "action": "container" },
+      { "triggers": ["use", "get"], "action": "container" }
+    ]},
     { "id": 99, "name": "BACKPACK" },
     { "id": 100, "name": "SCYTHE" },
     { "id": 101, "name": "PITCHFORK" },
@@ -142,14 +157,20 @@
     { "id": 139, "name": "FLOWERS" },
     { "id": 140, "name": "WALL_MOUNT" },
     { "id": 141, "name": "DECORATIVE_SWORD" },
-    { "id": 143, "name": "PICTURE" },
+    { "id": 143, "name": "PICTURE", "uses": [
+      { "triggers": ["look"], "action": "sign" }
+    ]},
     { "id": 145, "name": "CANDELABRA" },
     { "id": 146, "name": "PERSON_SLEEPING" },
     { "id": 147, "name": "CAULDRON" },
     { "id": 149, "name": "SHIP_DEED" },
     { "id": 150, "name": "INKWELL" },
-    { "id": 151, "name": "BOOK" },
-    { "id": 152, "name": "SCROLL" },
+    { "id": 151, "name": "BOOK", "uses": [
+      { "triggers": ["look"], "action": "sign" }
+    ]},
+    { "id": 152, "name": "SCROLL", "uses": [
+      { "triggers": ["look"], "action": "sign" }
+    ]},
     { "id": 153, "name": "PANPIPES" },
     { "id": 155, "name": "CRYSTAL_BALL", "breakable":  true },
     { "id": 156, "name": "HARPSICHORD" },
@@ -177,10 +198,16 @@
     { "id": 182, "name": "BEEHIVE" },
     { "id": 183, "name": "HONEY_JAR", "breakable":  true },
     { "id": 184, "name": "JAR_OF_HONEY", "breakable":  true },
-    { "id": 186, "name": "BARREL", "container": true, "containerCondition": "openable" },
+    { "id": 186, "name": "BARREL", "container": true, "containerCondition": "openable", "uses": [
+      { "triggers": ["search"], "frame": 0, "action": "container" },
+      { "triggers": ["use"], "action": "container" }
+    ]},
     { "id": 188, "name": "BAG", "container": true },
     { "id": 191, "name": "BASKET", "container": true },
-    { "id": 192, "name": "CRATE", "container": true, "containerCondition": "openable" },
+    { "id": 192, "name": "CRATE", "container": true, "containerCondition": "openable", "uses": [
+      { "triggers": ["search"], "frame": 0, "action": "container" },
+      { "triggers": ["use"], "action": "container" }
+    ]},
     { "id": 203, "name": "PLIERS" },
     { "id": 204, "name": "HAMMER" },
     { "id": 206, "name": "BRAZIER" },
@@ -206,11 +233,21 @@
     { "id": 249, "name": "RUNE_HUMILITY" },
     { "id": 252, "name": "CHAIR" },
     { "id": 253, "name": "CAMPFIRE" },
-    { "id": 254, "name": "CROSS" },
-    { "id": 255, "name": "TOMBSTONE" },
-    { "id": 256, "name": "PROTECTION_RING" },
-    { "id": 257, "name": "REGENERATION_RING" },
-    { "id": 258, "name": "INVISIBILITY_RING" },
+    { "id": 254, "name": "CROSS", "uses": [
+      { "triggers": ["look"], "action": "sign" }
+    ]},
+    { "id": 255, "name": "TOMBSTONE", "uses": [
+      { "triggers": ["look"], "action": "sign" }
+    ]},
+    { "id": 256, "name": "PROTECTION_RING", "uses": [
+      { "triggers": ["ready"], "frame": 0, "action": "magicRing" }
+    ] },
+    { "id": 257, "name": "REGENERATION_RING", "uses": [
+      { "triggers": ["ready"], "frame": 0, "action": "magicRing" }
+    ] },
+    { "id": 258, "name": "INVISIBILITY_RING", "uses": [
+      { "triggers": ["ready"], "frame": 0, "action": "magicRing" }
+    ] },
     { "id": 264, "name": "FISHING_POLE" },
     { "id": 265, "name": "FISH" },
     { "id": 266, "name": "GRAVE", "container": true },
@@ -228,10 +265,18 @@
     { "id": 289, "name": "LOG_SAW" },
     { "id": 293, "name": "CHAIN" },
     { "id": 296, "name": "XYLOPHONE" },
-    { "id": 297, "name": "OAKEN_DOOR" },
-    { "id": 298, "name": "WINDOWED_DOOR" },
-    { "id": 299, "name": "CEDAR_DOOR" },
-    { "id": 300, "name": "STEEL_DOOR" },
+    { "id": 297, "name": "OAKEN_DOOR", "uses": [
+      { "triggers": ["use"], "action": "door" }
+    ] },
+    { "id": 298, "name": "WINDOWED_DOOR", "uses": [
+      { "triggers": ["use"], "action": "door" }
+    ] },
+    { "id": 299, "name": "CEDAR_DOOR", "uses": [
+      { "triggers": ["use"], "action": "door" }
+    ] },
+    { "id": 300, "name": "STEEL_DOOR", "uses": [
+      { "triggers": ["use"], "action": "door" }
+    ] },
     { "id": 301, "name": "DOORWAY" },
     { "id": 305, "name": "LADDER" },
     { "id": 307, "name": "VOLCANO" },
@@ -244,9 +289,15 @@
     { "id": 320, "name": "SLEEP_FIELD" },
     { "id": 326, "name": "CAVE" },
     { "id": 327, "name": "THRONE" },
-    { "id": 332, "name": "SIGN" },
-    { "id": 333, "name": "SIGN_ARROW" },
-    { "id": 334, "name": "SECRET_DOOR" },
+    { "id": 332, "name": "SIGN", "uses": [
+      { "triggers": ["look"], "action": "sign" }
+    ]},
+    { "id": 333, "name": "SIGN_ARROW", "uses": [
+      { "triggers": ["look"], "action": "sign" }
+    ]},
+    { "id": 334, "name": "SECRET_DOOR", "uses": [
+      { "triggers": ["use", "search"], "action": "secretDoor" }
+    ]},
     { "id": 335, "name": "EGG", "stackable": true },
     { "id": 336, "name": "CHARGE" },
     { "id": 337, "name": "EFFECT", "stackable": true },

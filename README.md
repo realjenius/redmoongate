@@ -1,15 +1,13 @@
 TODOs
-What is the flags3 and 0x4 -- something to do with tile layer
-display artifacts/lines
+display artifacts/lines - I suspect this is related to inconsistent division
 massaging the object list before loading
 portrait load
 clock load
-actor manager load
 party load
 player load
 weather load
 player location load
-
+game clock implementation
 
 Article Topics:
 

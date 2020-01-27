@@ -5,11 +5,14 @@ import okio.Buffer
 import okio.buffer
 import okio.source
 import realjenius.moongate.gamedata.PositionalObject
+import realjenius.moongate.gamedata.actor.Actors
 import realjenius.moongate.gamedata.map.Maps
+import realjenius.moongate.gamedata.tile.TileFlag
 import realjenius.moongate.io.GameFiles
 import realjenius.moongate.io.LZW
 import realjenius.moongate.io.readUByteToInt
 import realjenius.moongate.io.readUShortLeToInt
+import java.util.*
 
 object GameObjects {
   private const val WEIGHTS_SKIP = 4096L
@@ -17,7 +20,7 @@ object GameObjects {
   lateinit var baseTiles: List<BaseTile>
 
   val objectsByLevel = Maps.levelSpecs.map {
-    SpatialStore(it.level)
+    SpatialStore<GameObject>(it.level)
   }
 
   fun load() {
@@ -35,6 +38,8 @@ object GameObjects {
         readObjectChunk(this, objectsByLevel[it])
       }
     }
+    Actors.load(dungeonState)
+
 
     // TODO - read the rest of the save game stuff.
     /*
@@ -92,7 +97,7 @@ object GameObjects {
     }
   }
 
-  private fun readObjectChunk(gameState: Buffer, store: SpatialStore) : Int {
+  private fun readObjectChunk(gameState: Buffer, store: SpatialStore<GameObject>) : Int {
     val objCount = gameState.readUShortLeToInt()
     (0 until objCount).forEach { _ ->
 
@@ -115,22 +120,32 @@ object GameObjects {
       val quality = gameState.readUByteToInt()
 
       val template = baseTiles[objId]
-      store.add(x, y, GameObject(template, frameNum))
+      store.add(x, y, GameObject(template, GameObjectStatus.fromFlag(status), frameNum))
     }
     return objCount
   }
 }
 
-enum class GameObjectStatus(val id: Int) {
+enum class GameObjectStatus(private val id: Int) {
   Invisible(0x2), Charmed(0x4), OnMap(0x0), InContainer(0x8),
-  InInventory(0x10), Readied(0x18), Temporary(0x20), Lit(0x80)
+  InInventory(0x10), Readied(0x18), Temporary(0x20), Lit(0x80);
+
+  fun matches(flag: Int) = this.id and flag > 0
+
+  companion object {
+    fun fromFlag(flag: Int) = emptySet().apply { addTo(this, flag) }
+    fun emptySet() = EnumSet.noneOf(GameObjectStatus::class.java)
+    fun addTo(set: EnumSet<GameObjectStatus>, flag: Int) = values().filterTo(set) { it.matches(flag) }
+  }
 }
 
 data class BaseTile(val objectTemplateId: Int, val type: GameObjectType, val tile: Int, var weight: Int = 0)
 
-data class GameObject(val objectTemplate: BaseTile, var frameNum: Int = 0) {
+data class GameObject(val objectTemplate: BaseTile, var status: EnumSet<GameObjectStatus> = GameObjectStatus.emptySet(), var frameNum: Int = 0) {
   val tileId: Int
     get() = objectTemplate.tile + frameNum
+
+  fun isVisible() = !status.contains(GameObjectStatus.Invisible)
 }
 
 data class GameObjectTypes(val types: List<GameObjectType>) {
@@ -145,4 +160,7 @@ data class GameObjectType(val id: Int,
                           val stackable: Boolean = false,
                           val stackCondition: String? = null,
                           val breakable: Boolean = false,
-                          val corpse: Boolean = false)
+                          val corpse: Boolean = false,
+                          val uses: List<GameObjectUse> = listOf())
+
+data class GameObjectUse(val triggers: List<String>, val frame: Int = -1, val distance: Int = 0, val action: String)

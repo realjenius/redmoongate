@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion
 import okio.Buffer
 import okio.buffer
 import okio.source
+import realjenius.moongate.gamedata.palette.Palette
 import realjenius.moongate.io.ByteView
 import realjenius.moongate.io.GameFiles
 import realjenius.moongate.io.LZW
@@ -68,7 +69,6 @@ object Tiles {
     val maskTypes = LZW.decompress(GameFiles.loadExternal("MASKTYPE.VGA"))
 
     tiles = GameFiles.loadExternal("TILEINDX.VGA").source().buffer().use { tileIndices ->
-
       val tileView = ByteView(allTiles, 0)
       (0 until 2048).map {
         val offset = tileIndices.readUShortLeToInt() * 16
@@ -109,13 +109,17 @@ object Tiles {
   private fun loadTileFlags() {
     GameFiles.loadExternal("TILEFLAG").source().buffer().use { buffer ->
       // Flag 1:
-      tiles.forEach { TileFlag.addTo(it.flags, buffer.readByteToInt()) }
+      tiles.forEach { TileFlag.addTo(it.flags, 1, buffer.readByteToInt()) }
       // Flag 2:
-      tiles.forEach { TileFlag.addTo(it.flags, buffer.readByteToInt()) }
+      tiles.forEach { TileFlag.addTo(it.flags, 2, buffer.readByteToInt()) }
       // Object weights are kept here... for some reason. Ideally this parsing would be shared between the two classes.
       buffer.skip(OBJECT_WEIGHTS)
-      // Articles
-      tiles.forEach { it.articleType = ArticleType.forFlag(buffer.readUByteToInt()) }
+      // Flag 3 and Articles
+      tiles.forEach {
+        val flag3 = buffer.readUByteToInt()
+        TileFlag.addTo(it.flags, 3, flag3)
+        it.articleType = ArticleType.forFlag(flag3)
+      }
     }
   }
 
@@ -188,18 +192,34 @@ object Tiles {
   }
 
   private fun generateSpriteSheet() {
-    val pixmap = Pixmap((tiles.size * 16) / 4, (tiles.size * 16) / 4, Pixmap.Format.RGBA8888)
-    tiles.forEachIndexed { index, tile -> tile.generateTexture((index / 4 * 16), index % 4 * 16, pixmap) }
+    // We will put rotated tile copies on the bottom of the spritesheet.
+    val rotatedTiles = tiles.filter { it.containsRotatedColors() }
+    val rotationHeight = 16
+    val pixmap = Pixmap((tiles.size * 16) / 4, ((rotatedTiles.size * 16) + (tiles.size * 16) / 4), Pixmap.Format.RGBA8888)
+    tiles.forEachIndexed { index, tile ->
+      tile.generateTexture((index / 4 * 16), index % 4 * 16, Palettes.forRotation(0), pixmap)
+    }
+    (1 until Palettes.rotationCount()).forEach { palette ->
+      rotatedTiles.forEachIndexed { index, tile ->
+        tile.generateTexture(palette * 16, ((index * 16) + (tiles.size * 16) / 4), Palettes.forRotation(palette), pixmap)
+      }
+    }
+
     spriteSheet = Texture(pixmap).apply { pixmap.dispose() }
-    tiles.forEachIndexed { index, tile -> tile.bindRegion(spriteSheet, (index / 4 * 16), index % 4 * 16) }
+    tiles.forEachIndexed { index, tile -> tile.bindRegion(spriteSheet, 0, (index / 4 * 16),index % 4 * 16) }
+    (1 until Palettes.rotationCount()).forEach { palette ->
+      rotatedTiles.forEachIndexed { index, tile ->
+        tile.bindRegion(spriteSheet, palette, palette * 16, ((index * 16) + (tiles.size * 16) / 4))
+      }
+    }
   }
 
   private fun loadCursors() {
     cursorPixmap = Pixmap(16, 16, Pixmap.Format.RGBA8888)
-    tiles[CURSOR_IDX].generateTexture(0, 0, cursorPixmap)
+    tiles[CURSOR_IDX].generateTexture(0, 0, Palettes.forRotation(0), cursorPixmap)
 
     usePixmap = Pixmap(16, 16, Pixmap.Format.RGBA8888)
-    tiles[USE_IDX].generateTexture(0, 0, usePixmap)
+    tiles[USE_IDX].generateTexture(0, 0, Palettes.forRotation(0), usePixmap)
   }
 }
 
@@ -213,22 +233,23 @@ enum class MaskType(val value: UByte) {
   }
 }
 
-enum class TileFlag(val masks: List<Int>) {
-  Passable(0x2),
-  Water(0x1),
-  Damages(0x8),
-  TopTile(0x10),
-  Boundary(listOf(0x4, 0x8)),
-  DoubleHeight( 0x40),
-  DoubleWidth( 0x80);
+enum class TileFlag(val flagId: Int, val masks: List<Int>) {
+  Passable(1, 0x2),
+  Water(1, 0x1),
+  Damages(1, 0x8),
+  TopTile(2, 0x10),
+  Boundary(2, listOf(0x4, 0x8)),
+  DoubleHeight(2,  0x40),
+  DoubleWidth(2, 0x80),
+  BottomTile(3, 0x4);
 
-  fun matches(flag: Int) = this.masks.any { (flag and it) > 0 }
+  fun matches(flagId: Int, flag: Int) = this.flagId == flagId && this.masks.any { (flag and it) > 0 }
 
-  constructor(mask: Int) : this(listOf(mask))
+  constructor(flagId: Int, mask: Int) : this(flagId, listOf(mask))
 
   companion object {
     fun emptySet() = EnumSet.noneOf(TileFlag::class.java)
-    fun addTo(set: EnumSet<TileFlag>, flag: Int) = values().filterTo(set) { it.matches(flag) }
+    fun addTo(set: EnumSet<TileFlag>, flagId: Int, flag: Int) = values().filterTo(set) { it.matches(flagId, flag) }
   }
 }
 
@@ -248,34 +269,44 @@ class Tile(val number: Int, data: ByteArray) {
   var flags = TileFlag.emptySet()
   var transparent = false
   lateinit var description: TileDescription
-  lateinit var sprite: TextureRegion
+  val sprites: MutableList<TextureRegion> = ArrayList(Palettes.rotationCount())
   lateinit var articleType: ArticleType
 
   fun isStackable() = description.isStackable
+
+  fun isDoubleWidth() = flags.contains(TileFlag.DoubleWidth)
+  fun isDoubleHeight() = flags.contains(TileFlag.DoubleHeight)
+  fun isTopTile() = flags.contains(TileFlag.TopTile)
+  fun isBottomTile() = flags.contains(TileFlag.BottomTile)
 
   fun clearPixels(offset: Int, count: Int) {
     data!!.fill(TRANSPARENT, offset, offset+count)
   }
 
-  fun generateTexture(xOffset: Int, yOffset: Int, pixmap: Pixmap) {
+  fun containsRotatedColors() = data!!.any { Palettes.isRotatedColor(it.toUByte().toInt()) }
+
+  fun generateTexture(xOffset: Int, yOffset: Int, palette: Palette, pixmap: Pixmap) {
     assert(data != null)
 
     (0 until 16).forEach { row ->
       (0 until 16).forEach { col ->
         val value = data!![row + col * 16]
         val color =
-            if (this.transparent && value == TRANSPARENT) Color.argb8888(1.toFloat(), 1.toFloat(), 1.toFloat(), 0.toFloat())
-            else Palettes.gamePalette.values[value.toUByte().toInt()].let {
-              Color.argb8888(it.red, it.green, it.blue, 1.toFloat())
+            if (this.transparent && value == TRANSPARENT)
+              Color.rgba8888(1.toFloat(), 1.toFloat(), 1.toFloat(), 0.toFloat())
+            else palette.values[value.toUByte().toInt()].let {
+              Color.rgba8888(it.red, it.green, it.blue, 1.toFloat())
             }
         pixmap.drawPixel(xOffset + row, yOffset + col, color)
       }
     }
   }
-  fun bindRegion(texture: Texture, xOffset: Int, yOffset: Int) {
-    this.sprite = TextureRegion(texture, xOffset, yOffset, 16, 16)
+  fun bindRegion(texture: Texture, paletteIndex: Int, xOffset: Int, yOffset: Int) {
+    this.sprites.add(TextureRegion(texture, xOffset, yOffset, 16, 16))
     this.data = null
   }
+
+  fun spriteForPalette(palette: Int) = if(this.sprites.size <= palette) this.sprites[0] else this.sprites[palette]
 }
 
 data class AnimationInfo(val count: Int, val data: List<AnimationData>)

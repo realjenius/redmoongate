@@ -12,12 +12,20 @@ import realjenius.moongate.ui.MapViewport
 import realjenius.moongate.gamedata.map.Maps
 import realjenius.moongate.gamedata.palette.Palettes
 import realjenius.moongate.gamedata.tile.Tiles
+import realjenius.moongate.tools.TileView
+import realjenius.moongate.ui.UIComponent
 
 class RedMoongate : ApplicationAdapter() {
 
   private lateinit var camera: OrthographicCamera
   private lateinit var batch: SpriteBatch
-  private lateinit var mapViewport: MapViewport
+  private lateinit var root: UIComponent
+  private lateinit var tiles: TileView
+  private lateinit var map: MapViewport
+
+  private var targetFrameTime = 33333333
+  private var lastTick = 0L
+
   override fun create() {
     camera = OrthographicCamera(Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
     camera.setToOrtho(false, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
@@ -28,34 +36,37 @@ class RedMoongate : ApplicationAdapter() {
     Tiles.load()
     Maps.load()
     GameObjects.load()
-    mapViewport = MapViewport(3)
-    mapViewport.moveTo(0,0)
+    map = MapViewport(0).apply { moveTo(0,0) }
+    tiles = TileView()
+    root = map
   }
 
   override fun render() {
-    Gdx.gl.glClearColor(0f, 0f, 0f, 1f)
-    Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
-    //Gdx.graphics.setCursor(Gdx.graphics.newCursor(Tiles.usePixmap, 0, 0))
-
-    if (Gdx.input.isKeyPressed(Input.Keys.LEFT)) mapViewport.shift(x = -1)
-    if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) mapViewport.shift(x = 1)
-    if (Gdx.input.isKeyPressed(Input.Keys.UP)) mapViewport.shift(y = -1)
-    if (Gdx.input.isKeyPressed(Input.Keys.DOWN)) mapViewport.shift(y = 1)
+    if (Gdx.input.isKeyJustPressed(Input.Keys.F1)) root = map
+    if (Gdx.input.isKeyJustPressed(Input.Keys.F2)) root = tiles
     if (Gdx.input.isKeyPressed(Input.Keys.PAGE_UP)) { camera.zoom *= 1.01f }
     if (Gdx.input.isKeyPressed(Input.Keys.PAGE_DOWN)) { camera.zoom *= .99f }
+    //Gdx.graphics.setCursor(Gdx.graphics.newCursor(Tiles.usePixmap, 0, 0))
+    root.input()
+    if (lastTick > 0L && (System.nanoTime() - lastTick) < targetFrameTime) return
 
-    mapViewport.update()
+    Gdx.gl.glClearColor(0f, 0f, 0f, 1f)
+    Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+
+    root.update()
+    Palettes.update()
 
     camera.update()
     batch.projectionMatrix = camera.combined
     batch.begin()
-    mapViewport.render(batch)
+    root.render(camera, batch)
     batch.end()
+    lastTick = System.nanoTime()
   }
 
   override fun dispose() {
     Tiles.dispose()
-    mapViewport.dispose()
+    root.dispose()
     batch.dispose()
   }
 }
