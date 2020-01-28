@@ -34,8 +34,7 @@ object LibraryIO {
     }
   }
 
-  private fun loadLibrary(path: String) : Pair<Long,BufferedSource>
-      = GameFiles.loadExternal(path).let { it.length() to it.source().buffer() }
+  private fun loadLibrary(path: String) = GameFiles.loadExternal(path).let { it.length() to it.source().buffer() }
 }
 
 private data class BlockIndex(val offset: Long, var length: Long = -1) {

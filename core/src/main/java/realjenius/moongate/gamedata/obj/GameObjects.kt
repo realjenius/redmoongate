@@ -4,10 +4,8 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import okio.Buffer
 import okio.buffer
 import okio.source
-import realjenius.moongate.gamedata.PositionalObject
 import realjenius.moongate.gamedata.actor.Actors
 import realjenius.moongate.gamedata.map.Maps
-import realjenius.moongate.gamedata.tile.TileFlag
 import realjenius.moongate.io.GameFiles
 import realjenius.moongate.io.LZW
 import realjenius.moongate.io.readUByteToInt

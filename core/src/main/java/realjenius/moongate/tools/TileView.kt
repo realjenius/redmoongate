@@ -15,7 +15,6 @@ class TileView : UIComponent {
 
   private var lastSelected = 0
   private var selected = 0
-  private var palette = 0
   private var font = BitmapFont().apply {
     this.color = Color.WHITE
   }
@@ -38,7 +37,7 @@ class TileView : UIComponent {
   override fun render(camera: OrthographicCamera, batch: SpriteBatch) {
     shapes.projectionMatrix = camera.combined
     shapes.begin(ShapeRenderer.ShapeType.Line)
-    (0 until 2048).forEach { index ->
+    for (index in 0 until 2048) {
       val x = index % 64
       val y = 32 - (index / 64)
       val drawX = 10 + (18 * x)

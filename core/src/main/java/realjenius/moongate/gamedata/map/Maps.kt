@@ -17,11 +17,9 @@ object Maps {
     val map = GameFiles.loadExternal("MAP").readBytes()
     val chunkData = GameFiles.loadExternal("CHUNKS").readBytes()
     val mapView = ByteView(map, 0)
-    levelSpecs.forEach { level ->
-      (0 until level.chunkCount).forEach { chunkNumber ->
+    for (level in levelSpecs)
+      for (chunkNumber in 0 until level.chunkCount)
         readChunks(mapView, chunkData, chunkNumber, level)
-      }
-    }
   }
 
   fun diameter(level: Int) = levelSpecs[level].diameter
@@ -32,8 +30,8 @@ object Maps {
     val worldX = chunkNum % 8 * 128
     val worldY = (chunkNum - (chunkNum % 8)) / 8 * 128
     val schunkDiam = level.blockSize
-    (0 until schunkDiam).forEach { first ->
-      (0 until schunkDiam step 2).forEach { second ->
+    for (first in 0 until schunkDiam) {
+      for (second in 0 until schunkDiam step 2) {
         val c1 = ((map[1].toUByte().toInt() and 0xf) shl 8) or map[0].toUByte().toInt()
         val c2 = (map[2].toUByte().toInt() shl 4) or (map[1].toUByte().toInt() shr 4)
 
@@ -48,7 +46,7 @@ object Maps {
     var chunkIndex = theChunkIndex
     var mapIndex = y * level.diameter + x
 
-    (0 until 8).forEach {
+    for (i in 0 until 8) {
       chunk.copyInto(level.data, destinationOffset = mapIndex, startIndex = chunkIndex, endIndex = chunkIndex + 8)
       mapIndex += level.diameter
       chunkIndex += 8

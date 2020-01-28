@@ -70,7 +70,7 @@ object Tiles {
 
     tiles = GameFiles.loadExternal("TILEINDX.VGA").source().buffer().use { tileIndices ->
       val tileView = ByteView(allTiles, 0)
-      (0 until 2048).map {
+      (0 until TILE_COUNT).map {
         val offset = tileIndices.readUShortLeToInt() * 16
         val num = it
         val maskType = MaskType.forByte(maskTypes[it].toUByte())
@@ -126,7 +126,7 @@ object Tiles {
   private fun loadAnimationData() {
     animationData = GameFiles.loadExternal("ANIMDATA").source().buffer().use { buffer ->
       val animCount = buffer.readUShortLeToInt()
-      val data = (0 until 32).map { AnimationData() }.toList().apply {
+      val data = (0 until 32).map { AnimationInfo.AnimationData() }.toList().apply {
         forEach {
           it.tile = buffer.readUShortLeToInt()
           if (it.tile in TRIGGERED_ANIM) it.loopCount = 0 else it.loopCount = -1
@@ -141,7 +141,7 @@ object Tiles {
 
   private fun loadAnimationMasks() {
     val maskData = ByteView(LZW.decompress(GameFiles.loadExternal("ANIMMASK.VGA")), 0)
-    (0 until 32).forEach { maskIdx ->
+    for (maskIdx in 0 until 32) {
       val tile = tiles[ANIMATED_TILE_OFFSET + maskIdx]
       tile.transparent = true
       var tileDataIndex = 0
@@ -192,14 +192,13 @@ object Tiles {
   }
 
   private fun generateSpriteSheet() {
-    // We will put rotated tile copies on the bottom of the spritesheet.
+    // We will put rotated tile copies on the bottom of the spritesheet, 1 row per tile rotation.
     val rotatedTiles = tiles.filter { it.containsRotatedColors() }
-    val rotationHeight = 16
     val pixmap = Pixmap((tiles.size * 16) / 4, ((rotatedTiles.size * 16) + (tiles.size * 16) / 4), Pixmap.Format.RGBA8888)
     tiles.forEachIndexed { index, tile ->
       tile.generateTexture((index / 4 * 16), index % 4 * 16, Palettes.forRotation(0), pixmap)
     }
-    (1 until Palettes.rotationCount()).forEach { palette ->
+    for (palette in 1 until Palettes.rotationCount()) {
       rotatedTiles.forEachIndexed { index, tile ->
         tile.generateTexture(palette * 16, ((index * 16) + (tiles.size * 16) / 4), Palettes.forRotation(palette), pixmap)
       }
@@ -207,7 +206,7 @@ object Tiles {
 
     spriteSheet = Texture(pixmap).apply { pixmap.dispose() }
     tiles.forEachIndexed { index, tile -> tile.bindRegion(spriteSheet, 0, (index / 4 * 16),index % 4 * 16) }
-    (1 until Palettes.rotationCount()).forEach { palette ->
+    for (palette in 1 until Palettes.rotationCount()) {
       rotatedTiles.forEachIndexed { index, tile ->
         tile.bindRegion(spriteSheet, palette, palette * 16, ((index * 16) + (tiles.size * 16) / 4))
       }
@@ -223,149 +222,3 @@ object Tiles {
   }
 }
 
-enum class MaskType(val value: UByte) {
-  Plain(0U), Trans(5U), PixelBlock(10U);
-
-  fun isTransparent() = this != Plain
-
-  companion object {
-    fun forByte(value: UByte) = values().first { it.value == value }
-  }
-}
-
-enum class TileFlag(val flagId: Int, val masks: List<Int>) {
-  Passable(1, 0x2),
-  Water(1, 0x1),
-  Damages(1, 0x8),
-  TopTile(2, 0x10),
-  Boundary(2, listOf(0x4, 0x8)),
-  DoubleHeight(2,  0x40),
-  DoubleWidth(2, 0x80),
-  BottomTile(3, 0x4);
-
-  fun matches(flagId: Int, flag: Int) = this.flagId == flagId && this.masks.any { (flag and it) > 0 }
-
-  constructor(flagId: Int, mask: Int) : this(flagId, listOf(mask))
-
-  companion object {
-    fun emptySet() = EnumSet.noneOf(TileFlag::class.java)
-    fun addTo(set: EnumSet<TileFlag>, flagId: Int, flag: Int) = values().filterTo(set) { it.matches(flagId, flag) }
-  }
-}
-
-enum class ArticleType(val mask: Int) {
-  None(0x00), A(0x01), An(0x10), The(0x11);
-
-  companion object {
-    fun forFlag(input: Int): ArticleType {
-      val value = (input shr 6)
-      return values().first { value and it.mask == it.mask }
-    }
-  }
-}
-
-class Tile(val number: Int, data: ByteArray) {
-  var data: ByteArray? = data // nullable so we can release the memory!
-  var flags = TileFlag.emptySet()
-  var transparent = false
-  lateinit var description: TileDescription
-  val sprites: MutableList<TextureRegion> = ArrayList(Palettes.rotationCount())
-  lateinit var articleType: ArticleType
-
-  fun isStackable() = description.isStackable
-
-  fun isDoubleWidth() = flags.contains(TileFlag.DoubleWidth)
-  fun isDoubleHeight() = flags.contains(TileFlag.DoubleHeight)
-  fun isTopTile() = flags.contains(TileFlag.TopTile)
-  fun isBottomTile() = flags.contains(TileFlag.BottomTile)
-
-  fun clearPixels(offset: Int, count: Int) {
-    data!!.fill(TRANSPARENT, offset, offset+count)
-  }
-
-  fun containsRotatedColors() = data!!.any { Palettes.isRotatedColor(it.toUByte().toInt()) }
-
-  fun generateTexture(xOffset: Int, yOffset: Int, palette: Palette, pixmap: Pixmap) {
-    assert(data != null)
-
-    (0 until 16).forEach { row ->
-      (0 until 16).forEach { col ->
-        val value = data!![row + col * 16]
-        val color =
-            if (this.transparent && value == TRANSPARENT)
-              Color.rgba8888(1.toFloat(), 1.toFloat(), 1.toFloat(), 0.toFloat())
-            else palette.values[value.toUByte().toInt()].let {
-              Color.rgba8888(it.red, it.green, it.blue, 1.toFloat())
-            }
-        pixmap.drawPixel(xOffset + row, yOffset + col, color)
-      }
-    }
-  }
-  fun bindRegion(texture: Texture, paletteIndex: Int, xOffset: Int, yOffset: Int) {
-    this.sprites.add(TextureRegion(texture, xOffset, yOffset, 16, 16))
-    this.data = null
-  }
-
-  fun spriteForPalette(palette: Int) = if(this.sprites.size <= palette) this.sprites[0] else this.sprites[palette]
-}
-
-data class AnimationInfo(val count: Int, val data: List<AnimationData>)
-
-data class AnimationData(var tile: Int = 0, var firstFrame: Int = 0, var andMasks: Byte = 0, var shiftValues: Byte = 0, var loopDirection: Boolean = false, var loopCount: Int = 0)
-
-data class TileDescription(private val segments: List<TextSegment>) {
-  val isStackable: Boolean by lazy { segments.any { it.supportsCount() } }
-  fun forCount(count: Int) = segments.joinToString("") { it.forCount(count) }
-
-  companion object {
-    fun parse(input: String) : TileDescription {
-      val segments = arrayListOf<TextSegment>()
-      var segmentStart = 0
-      var parseState = 0
-      var singularPart = ""
-      input.forEachIndexed { idx, char ->
-        when {
-          idx == input.length-1 -> {
-            if (parseState == 0)  segments.add(FixedSegment(input.substring(segmentStart, idx + 1)))
-            else segments.add(PluralChoice(singularPart, input.substring(segmentStart, idx + 1)))
-          }
-          parseState == 0 && char == '/' -> {
-            parseState = 1
-            if (segmentStart < idx) segments.add(FixedSegment(input.substring(segmentStart, idx)))
-            segmentStart = idx+1
-          }
-          char == '\\' -> {
-            if (segmentStart < idx) {
-              val text = input.substring(segmentStart, idx)
-              if (parseState == 1) singularPart = text
-              else segments.add(FixedSegment(text))
-            }
-            parseState = 2
-            segmentStart = idx + 1
-          }
-          parseState == 2 && char.isWhitespace() -> {
-            parseState = 0
-            if (segmentStart < idx) segments.add(PluralChoice(singularPart, input.substring(segmentStart, idx)))
-            segmentStart = idx
-            singularPart = ""
-          }
-        }
-      }
-      return TileDescription(segments)
-    }
-  }
-}
-
-interface TextSegment {
-  fun supportsCount() : Boolean
-  fun forCount(count: Int) : String
-}
-data class FixedSegment(private val text: String) : TextSegment {
-  override fun supportsCount() = false
-  override fun forCount(count: Int) = text
-}
-
-data class PluralChoice(private val singular: String, private val plural: String) : TextSegment {
-  override fun supportsCount() = true
-  override fun forCount(count: Int) = if (count == 1) singular else plural
-}

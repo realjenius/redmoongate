@@ -1,13 +1,16 @@
 package realjenius.moongate.gamedata.actor
 
 import okio.Buffer
+import realjenius.moongate.gamedata.map.Maps
+import realjenius.moongate.gamedata.obj.GameObjectStatus
 import realjenius.moongate.gamedata.obj.SpatialStore
 import realjenius.moongate.io.readUByteToInt
 import realjenius.moongate.io.readUShortLeToInt
+import java.util.*
 
 object Actors {
   val actors = (0 until 256).map { Actor(it) }
-  val spatialStore = SpatialStore<Actor>(0) // TODO - all levels
+  val actorsByLevel = Maps.levelSpecs.map { SpatialStore<Actor>(it.level) }
 
   fun load(buffer: Buffer) {
     parseStage(buffer, ::objectFlags) // 0x000 - 0x100 = object flags (torches and such)
@@ -22,14 +25,18 @@ object Actors {
     parseStage(buffer, ::health) // 0xe00 - 0xf00 - health
     // -- then we move on to party stuff
     // TODO - party stuff.
+    // 0ff1 - level
+    // 12f1-13f1 - combat mode
+    // 13f1-14f1 - magic
+    // 15f1-17f1 - base obj+frame
   }
 
   private inline fun parseStage(buffer: Buffer, stageParser: (buffer: Buffer, actor: Actor) -> Any?) {
-    actors.forEach { stageParser(buffer, it) }
+    for (it in actors) { stageParser(buffer, it) }
   }
 
   private fun objectFlags(buffer: Buffer, actor: Actor) {
-    actor.objectFlags = buffer.readUByteToInt()
+    actor.objectFlags = GameObjectStatus.fromFlag(buffer.readUByteToInt())
   }
 
   private fun coords(buffer: Buffer, actor: Actor) {
@@ -41,9 +48,7 @@ object Actors {
     actor.x = coord1 + ((coord2 and 0x3) shl 8)
     actor.y = ((coord2 and 0xfc) shr 2) + ((coord3 and 0xf) shl 6)
     actor.z = (coord3 and 0xf0) shr 4
-    if (actor.z == 0) {
-      spatialStore.add(actor.x, actor.y, actor)
-    }
+    actorsByLevel[actor.z].add(actor.x, actor.y, actor)
   }
 
   private fun objectRefs(buffer: Buffer, actor: Actor) {
@@ -57,6 +62,7 @@ object Actors {
 
   private fun statusFlags(buffer: Buffer, actor: Actor) {
     val status = buffer.readUByteToInt()
+
   }
 
   private fun strength(buffer: Buffer, actor: Actor) {
@@ -85,7 +91,7 @@ data class Actor(var id: Int = 0,
                  var temp: Boolean = false,
                  var objectId: Int = 0,
                  var frameNumber: Int = 0,
-                 var objectFlags: Int = 0,
+                 var objectFlags: EnumSet<GameObjectStatus> = GameObjectStatus.emptySet(),
                  var x: Int = 0,
                  var y: Int = 0,
                  var z: Int = 0,

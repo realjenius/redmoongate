@@ -2,7 +2,6 @@ package realjenius.moongate.io
 
 import okio.Buffer
 import okio.BufferedSource
-import okio.ByteString
 import okio.buffer
 import okio.source
 import realjenius.moongate.CodedError
@@ -25,9 +24,7 @@ object LZW {
     decompressInto(it, target)
   }
 
-  fun decompress(buffer: BufferedSource) : ByteArray {
-    return Buffer().apply { decompressInto(buffer, this) }.readByteArray()
-  }
+  fun decompress(buffer: BufferedSource) = Buffer().apply { decompressInto(buffer, this) }.readByteArray()
 
   fun decompressInto(buffer: BufferedSource, target: Buffer) {
     val uncompressedSize = buffer.readIntLe()
@@ -80,64 +77,64 @@ object LZW {
   }
 
   private fun readSegment(codeword: UInt, segments: Map<UInt, Segment>, addLast: Boolean = false) : ByteArray {
-      var currCodeword = codeword
-      val buffer = Buffer()
-      while (currCodeword > 0xffU) {
-        val seg = segments[currCodeword]
-            ?: CodedError.LzwParseError.fail("Unable to decompress, no entry for $currCodeword found")
+    var currCodeword = codeword
+    val buffer = Buffer()
+    while (currCodeword > 0xffU) {
+      val seg = segments[currCodeword]
+          ?: CodedError.LzwParseError.fail("Unable to decompress, no entry for $currCodeword found")
 
-        buffer.writeByte(seg.root.toInt())
-        currCodeword = seg.codeword
-      }
-      buffer.writeByte(currCodeword.toUByte().toInt())
-
-      return ByteArray(buffer.size.toInt() + if(addLast) 1 else 0).apply {
-        (0 until buffer.size.toInt()).forEach { this[it] = buffer[buffer.size-1-it] }
-        if (addLast) this[this.size-1] = buffer[buffer.size-1]
-      }
+      buffer.writeByte(seg.root.toInt())
+      currCodeword = seg.codeword
     }
-}
+    buffer.writeByte(currCodeword.toUByte().toInt())
 
-private data class Segment(val root: UByte, val codeword: UInt)
-
-private data class DecompressState(
-    var source: BufferedSource,
-    var target: Buffer = Buffer(),
-    var bitsRead: Int = 0,
-    var codewordSize: Int = STARTING_WORD_LEN,
-    var nextWord: UInt = STARTING_NEXT_WORD,
-    var dictSize: UInt = STARTING_DICT_SIZE,
-    var previousCodeword: UInt = 0U,
-    var segments: MutableMap<UInt,Segment> = hashMapOf()
-) {
-
-  fun reinit() {
-    codewordSize = STARTING_WORD_LEN
-    nextWord = STARTING_NEXT_WORD
-    dictSize = STARTING_DICT_SIZE
-    segments.clear()
+    return ByteArray(buffer.size.toInt() + if(addLast) 1 else 0).apply {
+      (0 until buffer.size.toInt()).forEach { this[it] = buffer[buffer.size-1-it] }
+      if (addLast) this[this.size-1] = buffer[buffer.size-1]
+    }
   }
 
-  fun advanceBitsRead() { bitsRead += codewordSize }
+  private data class Segment(val root: UByte, val codeword: UInt)
 
-  fun advanceCodeword(codeword: UInt) { previousCodeword = codeword }
+  private data class DecompressState(
+      var source: BufferedSource,
+      var target: Buffer = Buffer(),
+      var bitsRead: Int = 0,
+      var codewordSize: Int = STARTING_WORD_LEN,
+      var nextWord: UInt = STARTING_NEXT_WORD,
+      var dictSize: UInt = STARTING_DICT_SIZE,
+      var previousCodeword: UInt = 0U,
+      var segments: MutableMap<UInt,Segment> = hashMapOf()
+  ) {
 
-  fun isThreeByteCodewordPosition() = codewordSize + (bitsRead % 8) > 16
-
-  fun readByte(offset: Int = 0) = source.buffer[(bitsRead / 8 + offset).toLong()].toUByte().toUInt()
-
-  fun addByte(value: UInt) = target.writeByte(value.toInt())
-
-  fun addSegment(bytes: ByteArray) {
-    val root = bytes[0]
-    segments[nextWord] = Segment(root.toUByte(), previousCodeword)
-    nextWord++
-    if (nextWord >= dictSize && codewordSize < MAX_WORD_LEN) {
-      codewordSize++
-      dictSize *= 2U
+    fun reinit() {
+      codewordSize = STARTING_WORD_LEN
+      nextWord = STARTING_NEXT_WORD
+      dictSize = STARTING_DICT_SIZE
+      segments.clear()
     }
-    target.write(bytes)
-  }
 
-  fun checkBuffer(size: Int) = source.request(((bitsRead / 8) + size).toLong())
+    fun advanceBitsRead() { bitsRead += codewordSize }
+
+    fun advanceCodeword(codeword: UInt) { previousCodeword = codeword }
+
+    fun isThreeByteCodewordPosition() = codewordSize + (bitsRead % 8) > 16
+
+    fun readByte(offset: Int = 0) = source.buffer[(bitsRead / 8 + offset).toLong()].toUByte().toUInt()
+
+    fun addByte(value: UInt) = target.writeByte(value.toInt())
+
+    fun addSegment(bytes: ByteArray) {
+      val root = bytes[0]
+      segments[nextWord] = Segment(root.toUByte(), previousCodeword)
+      nextWord++
+      if (nextWord >= dictSize && codewordSize < MAX_WORD_LEN) {
+        codewordSize++
+        dictSize *= 2U
+      }
+      target.write(bytes)
+    }
+
+    fun checkBuffer(size: Int) = source.request(((bitsRead / 8) + size).toLong())
+  }
 }

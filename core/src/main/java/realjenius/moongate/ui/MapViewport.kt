@@ -46,13 +46,11 @@ class MapViewport(private val level: Int = 0, width: Int = DEFAULT_MAP_WIDTH, pr
     needsRebuild = false
     val mapRowLength = Maps.diameter(level)
     var viewportIdx = 0
-    (0 until numTilesY).forEach { y ->
-      (0 until numTilesX).forEach { x ->
-        val sourceMapX = (originX + x)
-        val sourceMapY = (originY + y)
-        viewableMap[viewportIdx] = Maps.mapForLevel(level)[sourceMapY * mapRowLength + sourceMapX]
-        viewportIdx++
-      }
+    eachTileIndex { x, y ->
+      val sourceMapX = (originX + x)
+      val sourceMapY = (originY + y)
+      viewableMap[viewportIdx] = Maps.mapForLevel(level)[sourceMapY * mapRowLength + sourceMapX]
+      viewportIdx++
     }
   }
 
@@ -66,42 +64,32 @@ class MapViewport(private val level: Int = 0, width: Int = DEFAULT_MAP_WIDTH, pr
     shapes.end()
   }
 
-  private fun renderMapTiles(batch: SpriteBatch) {
-    (0 until numTilesY).forEach { y ->
-      (0 until numTilesX).forEach { x ->
-        val drawX = x * 16
-        val drawY = (height) - y * 16
-        val tileIndex = viewableMap[(y * numTilesX) + x].toUByte().toInt()
-        if (tileIndex == 0)
-          shapes.rect(drawX.toFloat(), drawY.toFloat(), 16.toFloat(), 16.toFloat(), Color.BLACK, Color.BLACK, Color.BLACK, Color.BLACK)
-        else renderTile(tileIndex, batch, x, y, TileRenderState.Map)
-      }
+  private fun renderMapTiles(batch: SpriteBatch) = eachTileIndex { x, y ->
+    val drawX = x * 16
+    val drawY = (height) - y * 16
+    val tileIndex = viewableMap[(y * numTilesX) + x].toUByte().toInt()
+    if (tileIndex == 0)
+      shapes.rect(drawX.toFloat(), drawY.toFloat(), 16.toFloat(), 16.toFloat(), Color.BLACK, Color.BLACK, Color.BLACK, Color.BLACK)
+    else renderTile(tileIndex, batch, x, y, TileRenderState.Map)
+  }
+
+  private fun renderObjects(batch: SpriteBatch, renderState: TileRenderState) = eachTileIndex { x, y ->
+    val objsAt = GameObjects.objectsByLevel[level].get(originX + x, originY + y, 0)
+    objsAt.asReversed().forEach { obj ->
+      if (obj.isVisible()) renderTile(obj.tileId, batch, x, y, renderState)
     }
   }
 
-  private fun renderObjects(batch: SpriteBatch, renderState: TileRenderState) {
-    (0 until numTilesY).forEach { y ->
-      (0 until numTilesX).forEach { x ->
-        val objsAt = GameObjects.objectsByLevel[level].get(originX + x, originY + y, 0)
-        objsAt.asReversed().forEach { obj ->
-          if (obj.isVisible()) renderTile(obj.tileId, batch, x, y, renderState)
-        }
-      }
+  private fun renderActors(batch: SpriteBatch) = eachTileIndex { x, y ->
+    val actorsAt = Actors.actorsByLevel[level].get(originX + x, originY + y, 0)
+    actorsAt.forEach {
+      renderTile(GameObjects.baseTiles[it.objectId].tile + it.frameNumber, batch, x, y, TileRenderState.Actor)
     }
   }
 
-  private fun renderActors(batch: SpriteBatch) {
-    (0 until numTilesY).forEach { y ->
-      (0 until numTilesX).forEach { x ->
-
-        val actorsAt = Actors.spatialStore.get(originX + x, originY + y, 0)
-        actorsAt.forEach {
-          renderTile(GameObjects.baseTiles[it.objectId].tile + it.frameNumber, batch, x, y, TileRenderState.Actor)
-        }
-      }
-    }
+  private inline fun eachTileIndex(op: (x: Int, y: Int) -> Unit) {
+    (0 until numTilesY).forEach { y -> (0 until numTilesX).forEach { x -> op(x, y) } }
   }
-
 
   private fun renderTile(tileIndex: Int, batch: SpriteBatch, x: Int, y: Int, renderState: TileRenderState) {
     val tile = Tiles.tiles[tileIndex]

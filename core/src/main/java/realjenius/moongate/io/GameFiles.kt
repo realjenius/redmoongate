@@ -9,6 +9,7 @@ import java.nio.file.Files
 
 object GameFiles {
   const val STATICDATA = "STATICDATA"
+  // TODO Switch this to FileHandle to make it more portable.
   fun loadExternal(path: String) : File {
     return if (Env.testMode) File("${Env[STATICDATA]}/$path")
     else {
@@ -19,7 +20,5 @@ object GameFiles {
     }
   }
 
-  fun loadInternal(path: String) : FileHandle {
-    return Gdx.files.internal(path)
-  }
+  fun loadInternal(path: String) = Gdx.files.internal(path)
 }

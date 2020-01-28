@@ -36,7 +36,7 @@ class RedMoongate : ApplicationAdapter() {
     Tiles.load()
     Maps.load()
     GameObjects.load()
-    map = MapViewport(0).apply { moveTo(0,0) }
+    map = MapViewport(2).apply { moveTo(0,0) }
     tiles = TileView()
     root = map
   }
